@@ -24,3 +24,7 @@ gem 'haml-rails'
 gem 'thin'
 
 run 'bundle install'
+
+generate "mongoid:config"
+generate "rspec:install"
+generate "cucumber:install"
