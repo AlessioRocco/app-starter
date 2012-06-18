@@ -89,3 +89,26 @@ RSpec.configure do |config|
 end
 RUBY
 end
+
+remove_file "features/env.rb"
+create_file "features/env.rb" do
+    <<RUBY
+require 'rubygems'
+require 'spork'
+ 
+Spork.prefork do
+  ENV["RAILS_ENV"] ||= 'test'
+  require File.expand_path("../../../config/environment", __FILE__)
+  require 'cucumber/rails'
+
+  Capybara.default_selector = :css
+  
+  Before { Mongoid.master.collections.select {|c| c.name !~ /system/ }.each(&:drop) }
+  World FactoryGirl::Syntax::Methods
+end
+ 
+Spork.each_run do  
+  FactoryGirl.reload
+end
+  RUBY
+end
