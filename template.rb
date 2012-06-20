@@ -7,14 +7,13 @@ gem_group :test, :development do
 end
 
 gem_group :test do
-  gem 'cucumber-rails', require: false
+  gem "turnip"  
   gem 'capybara'
   gem 'mongoid-rspec'
   gem 'factory_girl_rails'
   gem 'simplecov', require: false
   gem 'growl'
   gem 'guard-rspec'
-  gem 'guard-cucumber'
   gem 'guard-spork'
   gem 'spork-rails'
 end
@@ -27,13 +26,16 @@ run 'bundle install'
 
 generate "mongoid:config"
 generate "rspec:install"
-generate "cucumber:install"
 
 empty_directory "spec/support"
 empty_directory "spec/factories"
+empty_directory "spec/acceptance"
+empty_directory "spec/acceptance/steps"
+
+append_to_file ".rspec", "-r turnip/rspec"
+
 remove_file "spec/spec_helper.rb"
-create_file "spec/spec_helper.rb" do
-  <<RUBY
+create_file "spec/spec_helper.rb", <<-MD
 require 'rubygems'
 require 'spork'
 #uncomment the following line to use spork with the debugger
@@ -44,8 +46,9 @@ Spork.prefork do
   require File.expand_path("../../config/environment", __FILE__)
   require 'rspec/rails'
   require 'rspec/autorun'
+  require 'turnip/capybara'
 
-  Dir[Rails.root.join("spec/support/**/*.rb")].each {|f| require f}
+  Dir[Rails.root.join("spec/acceptance/steps/**/*_steps.rb"), Rails.root.join("spec/support/**/*.rb")].each {|f| require f}
 
   RSpec.configure do |config|
     config.infer_base_class_for_anonymous_controllers = false
@@ -60,55 +63,64 @@ end
 Spork.each_run do
   FactoryGirl.reload
 end
-RUBY
-end
+MD
 
-create_file "spec/support/database_cleaner.rb" do
-  <<RUBY
+create_file "spec/support/database_cleaner.rb", <<-MD
 RSpec.configure do |config|
   # Clean/Reset Mongoid DB prior to running the tests
   config.before :each do
-    Mongoid.master.collections.select {|c| c.name !~ /system/ }.each(&:drop)
+    Mongoid.purge!
   end
 end
-RUBY
-end
+MD
 
-create_file "spec/support/factory_girl.rb" do
-  <<RUBY
+create_file "spec/support/factory_girl.rb", <<-MD
 RSpec.configure do |config|
   config.include FactoryGirl::Syntax::Methods
 end
-RUBY
-end
+MD
 
-create_file "spec/support/mongoid.rb" do
-  <<RUBY
+create_file "spec/support/mongoid.rb", <<-MD
 RSpec.configure do |config|
   config.include Mongoid::Matchers
 end
-RUBY
+MD
+
+create_file "Guardfile", <<-MD
+# A sample Guardfile
+# More info at https://github.com/guard/guard#readme
+
+guard 'spork', :rspec_env => { 'RAILS_ENV' => 'test' } do
+  watch('config/application.rb')
+  watch('config/environment.rb')
+  watch(%r{^config/environments/.+\.rb$})
+  watch(%r{^config/initializers/.+\.rb$})
+  watch('Gemfile')
+  watch('Gemfile.lock')
+  watch('spec/spec_helper.rb') { :rspec }
+  watch(%r{^spec/support/.+\.rb$})
 end
 
-remove_file "features/env.rb"
-create_file "features/env.rb" do
-    <<RUBY
-require 'rubygems'
-require 'spork'
- 
-Spork.prefork do
-  ENV["RAILS_ENV"] ||= 'test'
-  require File.expand_path("../../../config/environment", __FILE__)
-  require 'cucumber/rails'
 
-  Capybara.default_selector = :css
-  
-  Before { Mongoid.master.collections.select {|c| c.name !~ /system/ }.each(&:drop) }
-  World FactoryGirl::Syntax::Methods
+guard 'rspec', :version => 2, :cli => '--drb' do
+  watch(%r{^spec/.+_spec\.rb$})
+  watch(%r{^lib/(.+)\.rb$})     { |m| "spec/lib/\#{m[1]}_spec.rb" }
+  watch('spec/spec_helper.rb')  { "spec" }
+
+  # Rails example
+  watch(%r{^app/(.+)\.rb$})                           { |m| "spec/\#{m[1]}_spec.rb" }
+  watch(%r{^app/(.*)(\.erb|\.haml)$})                 { |m| "spec/\#{m[1]}\#{m[2]}_spec.rb" }
+  watch(%r{^app/controllers/(.+)_(controller)\.rb$})  { |m| ["spec/routing/\#{m[1]}_routing_spec.rb", "spec/\#{m[2]}s/\#{m[1]}_\#{m[2]}_spec.rb", "spec/acceptance/\#{m[1]}_spec.rb"] }
+  watch(%r{^spec/support/(.+)\.rb$})                  { "spec" }
+  watch('config/routes.rb')                           { "spec/routing" }
+  watch('app/controllers/application_controller.rb')  { "spec/controllers" }
+
+  # Capybara request specs
+  watch(%r{^app/views/(.+)/.*\.(erb|haml)$})          { |m| "spec/requests/\#{m[1]}_spec.rb" }
+
+  # Turnip features and steps
+  watch(%r{^spec/acceptance/(.+)\.feature$})
+  watch(%r{^spec/acceptance/steps/(.+)_steps\.rb$})   { |m| Dir[File.join("**/\#{m[1]}.feature")][0] || 'spec/acceptance' }
 end
- 
-Spork.each_run do  
-  FactoryGirl.reload
-end
-  RUBY
-end
+
+MD
