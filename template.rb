@@ -100,6 +100,14 @@ RSpec.configure do |config|
 end
 MD
 
+create_file "spec/support/turnip.rb", <<-MD
+RSpec.configure do |config|
+  # Include your steps here
+  # i.e. 
+  # config.include HelloWorldSteps
+end
+MD
+
 create_file "Guardfile", <<-MD
 # A sample Guardfile
 # More info at https://github.com/guard/guard#readme
