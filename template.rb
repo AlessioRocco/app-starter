@@ -44,6 +44,7 @@ empty_directory "spec/support"
 empty_directory "spec/factories"
 empty_directory "spec/acceptance"
 empty_directory "spec/acceptance/steps"
+empty_directory "spec/routing"
 
 append_to_file ".rspec", "-r turnip/rspec"
 
