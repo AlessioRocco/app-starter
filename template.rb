@@ -25,6 +25,19 @@ gem 'thin'
 run 'bundle install'
 
 generate "mongoid:config"
+
+append_to_file "config/mongoid.yml", <<-MD
+
+test:
+  sessions:
+    default:
+      database: #{@app_name}_test
+      hosts:
+        - localhost:27017
+      options:
+        consistency: :strong
+MD
+
 generate "rspec:install"
 
 empty_directory "spec/support"
